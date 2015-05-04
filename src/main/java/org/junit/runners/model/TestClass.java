@@ -198,13 +198,23 @@ public class TestClass implements Annotatable {
      * Returns the only public constructor in the class, or throws an {@code
      * AssertionError} if there are more or less than one.
      */
-
     public Constructor<?> getOnlyConstructor() {
         Constructor<?>[] constructors = clazz.getConstructors();
         Assert.assertEquals(1, constructors.length);
         return constructors[0];
     }
 
+    /**
+     * Construct a new instance of the test class from its only constructor
+     * throws an {@code AssertionError} if there are more or less than one
+     * constructor and will throw other Exceptions if the constructor cannot
+     * be accessed or the arguments are invalid
+     * @param args to pass to the constructor
+     */
+    public Object newInstance(Object ... args) throws Exception {
+        return getOnlyConstructor().newInstance(args);
+    }
+    
     /**
      * Returns the annotations on this class
      */

@@ -255,7 +255,7 @@ public class Theories extends BlockJUnit4ClassRunner {
                         Assume.assumeNotNull(params);
                     }
                     
-                    return getTestClass().getOnlyConstructor().newInstance(params);
+                    return getTestClass().newInstance(params);
                 }
             }.methodBlock(testMethod).evaluate();
         }

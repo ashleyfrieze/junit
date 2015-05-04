@@ -83,6 +83,15 @@ public abstract class ParentRunner<T> extends Runner implements Filterable,
         this.testClass = createTestClass(testClass);
         validate();
     }
+    
+    /**
+     * Constructs a new {@code ParentRunner} that will run the class inside
+     * {@code @TestClass}
+     */
+    protected ParentRunner(TestClass testClass) throws InitializationError {
+        this.testClass = testClass;
+        validate();
+    }
 
     protected TestClass createTestClass(Class<?> testClass) {
         return new TestClass(testClass);
