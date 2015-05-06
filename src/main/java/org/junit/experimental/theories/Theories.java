@@ -5,7 +5,10 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Assume;
@@ -82,6 +85,7 @@ public class Theories extends BlockJUnit4ClassRunner {
         super.collectInitializationErrors(errors);
         validateDataPointFields(errors);
         validateDataPointMethods(errors);
+        validateAssumptionMethods(errors);
     }
 
     private void validateDataPointFields(List<Throwable> errors) {
@@ -115,6 +119,19 @@ public class Theories extends BlockJUnit4ClassRunner {
             }
         }
     }
+    
+    private void validateAssumptionMethods(List<Throwable> errors) {
+        List<FrameworkMethod> methods = getTestClass().getAnnotatedMethods(Assumption.class);
+        
+        for (FrameworkMethod method : methods) {
+            if(!method.isPublic()) {
+                errors.add(new Error("Assumption method " + method.getName() + " must be public"));
+            }
+            if(method.getMethod().getParameterTypes().length<1) {
+                errors.add(new Error("Assumption method " + method.getName() + " should take parameters"));
+            }
+        }
+    }    
 
     @Override
     protected void validateConstructor(List<Throwable> errors) {
@@ -274,8 +291,64 @@ public class Theories extends BlockJUnit4ClassRunner {
                     if (!nullsOk()) {
                         Assume.assumeNotNull(values);
                     }
+                    processMethodAssumptionsByAnnotation(method, values, freshInstance);
                     
                     method.invokeExplosively(freshInstance, values);
+                }
+
+                private void processMethodAssumptionsByAnnotation(
+                        final FrameworkMethod method, final Object[] values,
+                        final Object freshInstance) throws Throwable {
+                    Assumes assumes = method.getAnnotation(Assumes.class);
+                    if (assumes==null) {
+                        return;
+                    }
+                    List<FrameworkMethod> mustPass = getAssumptions(assumes.value());
+                    List<FrameworkMethod> mustFail = getAssumptions(assumes.not());
+                    
+                    executeAll(mustPass, values, freshInstance);
+                    tryToGetAssumptionsToFail(mustFail, values, freshInstance);
+                }
+
+                private void tryToGetAssumptionsToFail(final List<FrameworkMethod> mustFail,
+                        final Object[] values,
+                        final Object freshInstance) throws Throwable {
+                    if (mustFail.size()==0) {
+                        return;
+                    }
+                    try {
+                        executeAll(mustFail, values, freshInstance);
+                    } catch (AssumptionViolatedException e) {
+                        // that's good we want it to fail
+                        return;
+                    }
+                    Assume.assumeTrue("Did not fail all assumptions", false);
+                }
+
+                private List<FrameworkMethod> getAssumptions(final String[] names) {
+                    List<FrameworkMethod> result = new ArrayList<FrameworkMethod>();
+                    Set<String> requiredFunctions = new HashSet<String>();
+                    requiredFunctions.addAll(Arrays.asList(names));
+                    
+                    boolean addAll = requiredFunctions.contains(Assumes.ALL);
+                    for(FrameworkMethod method:getTestClass().getAnnotatedMethods(Assumption.class)) {
+                        if (addAll || requiredFunctions.contains(method.getName())) {
+                            result.add(method);
+                        }
+                    }
+                    
+                    return result;
+                }
+
+                private void executeAll(final List<FrameworkMethod> methods, final Object[] values, final Object freshInstance) throws Throwable {
+                    for(FrameworkMethod method:methods) {
+                        if (method.isStatic()) {
+                            method.invokeExplosively(null, values);
+                        } else {
+                            method.invokeExplosively(freshInstance, values);
+                        }
+                    }
+                    
                 }
             };
         }
